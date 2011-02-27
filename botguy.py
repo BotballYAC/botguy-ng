@@ -14,7 +14,7 @@ from commands import userdef
 class Botguy(bot.SimpleBot):
     
     def __init__(self, *args, **kwargs):
-        info_file = "botguy-info.dat"
+        info_file = "botguy_info.dat"
         if "info_file" in kwargs:
             info_file = kwargs["info_file"]
             del kwargs["info_file"]
@@ -63,7 +63,8 @@ class Botguy(bot.SimpleBot):
                 if c.search(m):
                     self.send_message(event.target,
                                       event.source + ", please refrain from " +
-                                      "using cuss words in the #botball chat.")
+                                      "using cuss words in the " + event.target
+                                      + " chat.")
                     has_curse = True
                     break
             if not has_curse:
