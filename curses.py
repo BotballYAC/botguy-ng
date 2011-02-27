@@ -1,6 +1,6 @@
 import re
 
-curses = ["fuck", "fucking", "fucked", "damn", "damnation", "dammit",
+curses = ["fuck", "fucking", "fucked", "damn", "damnation", "dammit", "crap",
           "goddammit", "shit", "screwed", "shoes"]
 regex_curses = []
 

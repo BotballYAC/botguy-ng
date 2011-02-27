@@ -14,7 +14,7 @@ from commands import userdef
 class Botguy(bot.SimpleBot):
     
     def __init__(self, *args, **kwargs):
-        info_file = "botguy-info.dat"
+        info_file = "botguy_info.dat"
         if "info_file" in kwargs:
             info_file = kwargs["info_file"]
             del kwargs["info_file"]
