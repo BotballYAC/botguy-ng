@@ -1,7 +1,8 @@
 import re
 
 curses = ["fuck", "fucking", "fucked", "damn", "damnation", "dammit", "crap",
-          "goddammit", "shit", "screwed", "shoes"]
+          "goddammit", "shit", "screwed", "shoes", "ass", "asshat",
+          "donkey kong"]
 regex_curses = []
 
 for c in curses:
