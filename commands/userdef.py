@@ -8,6 +8,8 @@ class UserDefinedCommand(command.BaseCommand):
         regex = re.compile("(set|del|get|get_raw|list|.*)")
         super(UserDefinedCommand, self).__init__(parent_bot, regex, 95)
         self.info_db = self.parent_bot.info_db
+        self.modified = True
+        self.last_list_url = None
         self.command_ref_re = re.compile(r"!(\w+)")
     
     def parse_command(self, command, args, event):
@@ -28,30 +30,36 @@ class UserDefinedCommand(command.BaseCommand):
             else:
                 self.db_del(args, event)
         elif command == "list":
-            listing = ""
-            ref_dict = {}
-            keys = list(self.info_db.keys())
-            while keys:
-                i = keys[0]; del keys[0]
-                ref_set = set()
-                while self.command_ref_re.match(self.info_db[i]):
+            if not self.modified:
+                self.parent_bot.send_message(event.target, event.source + ", " +
+                                                           self.last_list_url)
+            else:
+                listing = ""
+                ref_dict = {}
+                keys = list(self.info_db.keys())
+                while keys:
+                    i = keys[0]; del keys[0]
+                    ref_set = set()
+                    while self.command_ref_re.match(self.info_db[i]):
+                        ref_set.add(i)
+                        i = self.command_ref_re.match(self.info_db[i]).group(1)
                     ref_set.add(i)
-                    i = self.command_ref_re.match(self.info_db[i]).group(1)
-                ref_set.add(i)
-                i = self.info_db[i]
-                if i in ref_dict:
-                    ref_dict[i] |= ref_set
-                else:
-                    ref_dict[i] = ref_set
-            # Generate listing
-            for k in ref_dict.keys():
-                for i in ref_dict[k]:
-                    listing += i + ":\n"
-                listing += "\t" + k + "\n"
-            url = pastie.Pastie(body=listing, parser=None, private=True,
-                                name=self.parent_bot.nickname).submit()
-            self.parent_bot.send_message(event.target, event.source + ", " +
-                                                       url)
+                    i = self.info_db[i]
+                    if i in ref_dict:
+                        ref_dict[i] |= ref_set
+                    else:
+                        ref_dict[i] = ref_set
+                # Generate listing
+                for k in ref_dict.keys():
+                    for i in ref_dict[k]:
+                        listing += i + ":\n"
+                    listing += "\t" + k + "\n"
+                url = pastie.Pastie(body=listing, parser=None, private=False,
+                                    name=self.parent_bot.nickname).submit()
+                self.parent_bot.send_message(event.target, event.source + ", " +
+                                                           url)
+                self.modified = False
+                self.last_list_url = url
         elif command == "get":
             if not args:
                 self.parent_bot.send_message(event.target, event.source +
@@ -75,6 +83,7 @@ class UserDefinedCommand(command.BaseCommand):
     
     
     def db_set(self, key, value, event):
+        self.modified = True
         key = key.lower()
         # block undefined references
         match = self.command_ref_re.match(value)
@@ -112,6 +121,7 @@ class UserDefinedCommand(command.BaseCommand):
     
     
     def db_del(self, key, event):
+        self.modified = True
         key = key.lower()
         if key not in self.info_db:
             self.parent_bot.send_message(event.target, event.source + ", \"!" +
