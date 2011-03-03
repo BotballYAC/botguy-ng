@@ -110,6 +110,16 @@ def parse_prefix(prefix):
     return nick, user, host
 
 
+def create_prefix(nick, user, host):
+    """ Builds a prefix based on the nick, user, and host provided. This is essentially the
+    opposite to parse_prefix().
+    
+        >>> create_prefix("Jack", "~jack", "000-000-000-000.example.com")
+        'Jack!~jack@000-000-000-000.example.com'
+    """
+    return "{0}!{1}@{2}".format(nick, user, host)
+
+
 _special_chars = ('-', '[', ']', '\\', '`', '^', '{', '}', '_')
 def is_nick(nick):
     """ Checks to see if a nickname `nick` is valid.
@@ -157,7 +167,10 @@ def ip_to_ascii(ip_address):
 
 def ascii_to_ip(ascii_ip_value):
     """ Converts the integer value to a quad IP format. """
-    ascii_ip_value = int(ascii_ip_value)
+    try:
+        ascii_ip_value = long(ascii_ip_value)
+    except:
+        ascii_ip_value = int(ascii_ip_value) # python3k handler
     return str(socket.inet_ntoa(struct.pack('!L', ascii_ip_value)))
 
 
@@ -174,6 +187,17 @@ class Channel(object):
 
     def __str__(self):
         return "<Channel %s '%s users'>" % (self.name, len(self.user_list))
+
+
+class User(object):
+    """ Represents an individual user. """
+    def __init__(self):
+        self.user = None
+        self.host = None
+        self.nick = None
+        self.flags = None
+        self.server = None
+        self.real_name = None
 
 
 if __name__ == "__main__":

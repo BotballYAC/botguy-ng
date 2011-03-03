@@ -9,7 +9,6 @@ is parsed to fill in the values for the event object.
 """
 import bisect
 import collections
-import re
 import traceback
 
 from . import protocol
@@ -35,7 +34,7 @@ class EventDispatcher(object):
         return self._listeners[name]
     
     def __iter__(self):
-        return iter(list(self._listeners.keys()))
+        return iter(self._listeners)
     
     def dispatch(self, client, event):
         """ Notifies all of the listeners that an event is available.
@@ -43,7 +42,7 @@ class EventDispatcher(object):
         the listener is looking for will then activate its event handlers.
         
         """
-        for name, listener in list(self._listeners.items()):
+        for name, listener in self._listeners.items():
             if listener.handlers != []:
                 listener.notify(client, event)
 
@@ -52,20 +51,32 @@ class EventDispatcher(object):
 # ------------------------------------------------------------------------------
 # > BEGIN EVENT OBJECTS 
 # ------------------------------------------------------------------------------
-
+#
 
 
 class Event(object):
     pass
 
 
+class ConnectionEvent(Event):
+    """ Handles events for connecting and disconnecting. Currently, the only useful data in
+    the event object is the command. It will either be CONN_CONNECT or CONN_DISCONNECT.
+    """
+    def __init__(self, command):
+        self.command = command
+        self.source = None
+        self.target = None
+        self.params = []
+
+
 class StandardEvent(Event):
     """ Represents a standard event. """
     def __init__(self, prefix, command, params):
         self.command = command
+        self.prefix = prefix
         self.source, self.user, self.host = protocol.parse_prefix(prefix)
         if len(params) > 0:
-            if params[0] not in protocol.commands_with_no_target:
+            if command not in protocol.commands_with_no_target:
                 self.target = params[0]
                 self.params = params[1:]
             else:
@@ -132,11 +143,14 @@ class EventListener(object):
         use this method as handlers are automatically added.
                 
         """
-        bisect.insort(self.handlers, (priority, handler))
+        self.handlers.insert(
+            bisect.bisect([h[0] for h in self.handlers], priority),
+            (priority, handler)
+        )
     
     def remove_handler(self, handler):
         """ This removes all handlers that are equal to the ``handler`` which
-        are bound to the event listener. This isn't too inefficient since
+        are bound to the event listener. This isn't too efficient since
         it is ``O(n^2)``.
         """
         for p, l in self.handlers:
@@ -150,10 +164,14 @@ class EventListener(object):
         handler. It's a good idea to always make sure to send in the client
         and the event.
         """
+        try:
+            e = StandardError
+        except:
+            e = Exception
         for p, handler in self.handlers:
             try:
                 handler(*args)
-            except Exception as ex:
+            except e as ex:
                 traceback.print_exc(ex)
                 self.handlers.remove((p, handler))
     
@@ -203,6 +221,24 @@ def create_listener(command=None, target=None, source=None):
 # ------------------------------------------------------------------------------
 # > BEGIN BUILT-IN EVENT LISTENERS
 # ------------------------------------------------------------------------------
+
+
+class ConnectListener(EventListener):
+    def notify(self, client, event):
+        if event.command == "CONN_CONNECT":
+            self.activate_handlers(client, event)
+
+class DisconnectListener(EventListener):
+    def notify(self, client, event):
+        if event.command == "CONN_DISCONNECT":
+            self.activate_handlers(client, event)
+
+
+connection = {
+    "connect": ConnectListener,
+    "disconnect": DisconnectListener
+}
+
 
 
 class AnyListener(EventListener):
@@ -383,6 +419,7 @@ class ReplyListener(EventListener):
             self.activate_handlers(client, event)
 
 
+
 class NameReplyListener(ReplyListener):
     
     class NameReplyEvent(Event):
@@ -401,17 +438,18 @@ class NameReplyListener(ReplyListener):
             # 
             # - "@" is used for secret channels, "*" for private
             # channels, and "=" for others (public channels).
-            channel = event.params[1]
+            channel = event.params[1].lower()
             names = event.params[2].strip().split(" ")
             # TODO: This line below is wrong. It doesn't use name symbols.
             names = list(map(protocol.strip_name_symbol, names))
             self._name_lists[channel].name_list.extend(names)
         elif event.command == "RPL_ENDOFNAMES":
             # <channel> :End of NAMES list
-            name_event = self._name_lists[event.params[0]]
-            name_event.channel = event.params[0]
+            channel_name = event.params[0]
+            name_event = self._name_lists[channel_name]
+            name_event.channel = channel_name
             self.activate_handlers(client, name_event)
-            del self._name_lists[event.params[0]]
+            del self._name_lists[channel_name]
 
 
 
@@ -428,7 +466,7 @@ class ListReplyListener(ReplyListener):
     def notify(self, client, event):
         if event.command == "RPL_LIST":
             # <channel> <# visible> :<topic>
-            channel_data = (event.params[0], event.params[1], event.params[2])
+            channel_data = (event.params[0].lower(), event.params[1], event.params[2])
             self.channel_list.append(channel_data)
         elif event.command == "RPL_LISTEND":
             # :End of LIST
@@ -484,6 +522,37 @@ class WhoisReplyListener(ReplyListener):
             del self._whois_replies[event.params[0]]
 
 
+
+class WhoReplyListener(ReplyListener):
+    """ http://tools.ietf.org/html/rfc1459#section-4.5.2 """
+    
+    class WhoReplyEvent(Event):
+        def __init__(self):
+            self.channel_name = None
+            self.user_list = []
+    
+    def __init__(self):
+        ReplyListener.__init__(self)
+        self._who_replies = collections.defaultdict(self.WhoReplyEvent)
+    
+    def notify(self, client, event):
+        if event.command == "RPL_WHOREPLY":
+            channel = event.params[0].lower()
+            user = protocol.User()
+            user.user = event.params[1]
+            user.host = event.params[2]
+            user.server = event.params[3]
+            user.nick = event.params[4]
+            user.real_name = event.params[6].split()[1]
+            self._who_replies[channel].user_list.append(user)
+        elif event.command == "RPL_ENDOFWHO":
+            channel = event.params[0].lower()
+            self._who_replies[channel].channel_name = channel
+            self.activate_handlers(client, self._who_replies[channel])
+
+
+
+
 class ErrorReplyListener(ReplyListener):
     def notify(self, client, event):
         if event.command.startswith("ERR_"):
@@ -495,5 +564,6 @@ replies = {
     "name_reply": NameReplyListener,
     "list_reply": ListReplyListener,
     "whois_reply": WhoisReplyListener,
+    "who_reply": WhoReplyListener,
     "error_reply": ErrorReplyListener
     }

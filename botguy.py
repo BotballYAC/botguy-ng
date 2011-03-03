@@ -1,11 +1,9 @@
-from __future__ import with_statement
-
 from ircutils import bot
 import re
 import curses
-import rss
-import rss_feeds
-import shelve
+from rss import rss
+from rss import rss_feeds
+import shelve, dbm
 import atexit
 import threading
 import traceback
@@ -14,13 +12,16 @@ from commands import userdef
 class Botguy(bot.SimpleBot):
     
     def __init__(self, *args, **kwargs):
-        info_file = "botguy_info.dat"
+        info_file = "botguy_info.db"
         if "info_file" in kwargs:
             info_file = kwargs["info_file"]
             del kwargs["info_file"]
         super(Botguy, self).__init__(*args, **kwargs)
         self.channel_set = set()
-        self.info_db = shelve.open(info_file)
+        try:
+            self.info_db = shelve.open(info_file, protocol=2)
+        except dbm.error:
+            self.info_db = shelve.open(info_file[:-3], protocol=2)
         atexit.register(self.info_db.close)
         self.commands_list = [userdef.UserDefinedCommand(self)]
         self.commands_list.sort()
@@ -90,7 +91,7 @@ class Botguy(bot.SimpleBot):
                                                   "Please bother the " +
                                                   "operator of this bot to " +
                                                   "fix me.")
-                                print(traceback.print_exc())
+                                print((traceback.print_exc()))
                             had_command = True
                             break;
                     if not had_command:

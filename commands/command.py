@@ -1,6 +1,7 @@
 import abc
 
 class BaseCommand(object):
+    
     __metaclass__ = abc.ABCMeta
     
     @abc.abstractmethod

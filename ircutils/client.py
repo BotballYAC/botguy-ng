@@ -52,6 +52,10 @@ class SimpleClient(object):
     def _register_default_listeners(self):
         """ Registers the default listeners to the names listed in events. """
         
+        # Connection events
+        for name in events.connection:
+            self.events.register_listener(name, events.connection[name]())
+        
         # Standard events
         for name in events.standard:
             self.events.register_listener(name, events.standard[name]())
@@ -70,7 +74,7 @@ class SimpleClient(object):
         
         # Custom listeners
         for name in self.custom_listeners:
-            self.events.register_listener(name, self.custom_listeners[name]())
+            self.events.register_listener(name, self.custom_listeners[name])
     
     
     def _add_built_in_handlers(self):
@@ -83,8 +87,8 @@ class SimpleClient(object):
         self.events["any"].add_handler(_update_client_info)
         self.events["name_reply"].add_handler(_set_channel_names)
         self.events["ctcp_version"].add_handler(_reply_to_ctcp_version)
-        self.events["part"].add_handler(_remove_channel_user)
-        self.events["quit"].add_handler(_remove_channel_user)
+        self.events["part"].add_handler(_remove_channel_user_on_part)
+        self.events["quit"].add_handler(_remove_channel_user_on_quit)
         self.events["join"].add_handler(_add_channel_user)
     
     
@@ -130,11 +134,16 @@ class SimpleClient(object):
         self.conn.execute("USER", self.user, self._mode, "*", 
                                   trailing=self.real_name)
         self.conn.execute("NICK", self.nickname)
+        self.conn.handle_connect = self._handle_connect
+        self.conn.handle_close = self._handle_disconnect
         
         if channel is not None:
             # Builds a handler on-the-fly for joining init channels
-            
-            if isinstance(channel, str):
+            try:
+                basestring
+            except:
+                basestring = str
+            if isinstance(channel, basestring):
                 channels = [channel]
             else:
                 channels = channel
@@ -144,6 +153,20 @@ class SimpleClient(object):
                     client.join_channel(channel)
             
             self.events["welcome"].add_handler(_auto_joiner)
+    
+    
+    def is_connected(self):
+        return self.conn.connected
+    
+    def _handle_connect(self):
+        connection.Connection.handle_connect(self.conn)
+        event = events.ConnectionEvent("CONN_CONNECT")
+        self.events.dispatch(self, event)
+    
+    def _handle_disconnect(self):
+        connection.Connection.handle_close(self.conn)
+        event = events.ConnectionEvent("CONN_DISCONNECT")
+        self.events.dispatch(self, event)
     
     
     def register_listener(self, event_name, listener):
@@ -311,33 +334,41 @@ def _update_client_info(client, event):
         if not protocol.is_channel(event.params[0]):
             client.nickname = client._prev_nickname
     elif command == "NICK" and event.source == client.nickname:
-        client.nickname = event.trailing
-    if command in ["ERR_INVITEONLYCHAN", "ERR_CHANNELISFULL", 
-                   "ERR_BANNEDFROMCHAN", "ERR_BADCHANNELKEY", 
-                   "ERR_TOOMANYCHANNELS"]:
-        if params[0] in client.channels:
-            del client.channels[params[0]]
-    elif command == "ERR_NOSUCHCHANNEL" and params[0] in client.channels:
-        del client.channels[params[0]]
-    elif command == "ERR_BADCHANMASK" and params[0] in client.channels:
-        del client.channels[params[0]]
+        client.nickname = event.target
+    
+    if command in ["ERR_INVITEONLYCHAN", "ERR_CHANNELISFULL",  "ERR_BANNEDFROMCHAN", 
+                   "ERR_BADCHANNELKEY", "ERR_TOOMANYCHANNELS", "ERR_NOSUCHCHANNEL"
+                   "ERR_BADCHANMASK"]:
+        channel_name = params[0].lower()
+        if channel_name in client.channels:
+            del client.channels[channel_name]
     elif command == "ERR_UNAVAILRESOURCE":
-        if protocol.is_channel(params[0]) and params[0] in client.channels:
-            del client.channels[params[0]]
+        channel_name = params[0].lower()
+        if protocol.is_channel(channel_name) and channel_name in client.channels:
+            del client.channels[channel_name]
 
 
 def _set_channel_names(client, name_event):
-    channel_name = name_event.channel
+    channel_name = name_event.channel.lower()
     client.channels[channel_name].name = channel_name
     client.channels[channel_name].user_list = name_event.name_list
 
-def _remove_channel_user(client, event):
-    channel = event.target
+
+def _remove_channel_user_on_part(client, event):
+    channel = event.target.lower()
     if event.source == client.nickname:
         del client.channels[channel]
     elif event.source in client.channels[channel].user_list:
         client.channels[channel].user_list.remove(event.source)
 
+
+def _remove_channel_user_on_quit(client, event):
+    # TODO: This solution is slow. There might be a better one.
+    for channel in client.channels:
+        if event.source in client.channels[channel].user_list:
+            client.channels[channel].user_list.remove(event.source)
+
+
 def _add_channel_user(client, event):
-    channel = event.target
+    channel = event.target.lower()
     client.channels[channel].user_list.append(event.source)

@@ -1,4 +1,7 @@
-import feedparser
+try:
+    import feedparser
+except:
+    from . import feedparser3k as feedparser
 import threading
 from time import sleep
 
@@ -19,7 +22,7 @@ class RssPoller(threading.Thread):
             self.poll()
     
     def poll(self):
-        print("Polling " + self.feed_url)
+        print(("Polling " + self.feed_url))
         parse_kwargs = {}
         if hasattr(self.feed, "modified"):
             parse_kwargs["modified"] = self.feed.modified

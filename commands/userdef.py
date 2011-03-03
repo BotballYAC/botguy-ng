@@ -1,6 +1,6 @@
-import command
+from . import command
 import re
-import pastie
+from . import pastie
 
 class UserDefinedCommand(command.BaseCommand):
     
@@ -50,7 +50,7 @@ class UserDefinedCommand(command.BaseCommand):
                     else:
                         ref_dict[i] = ref_set
                 # Generate listing
-                for k in ref_dict.keys():
+                for k in list(ref_dict.keys()):
                     for i in ref_dict[k]:
                         listing += i + ":\n"
                     listing += "\t" + k + "\n"
@@ -87,14 +87,14 @@ class UserDefinedCommand(command.BaseCommand):
         key = key.lower()
         # block undefined references
         match = self.command_ref_re.match(value)
-        if match and (match.group(1) not in self.info_db):
+        if match and (str(match.group(1)) not in self.info_db):
             self.parent_bot.send_message(event.target, event.source + ", \"" +
                                          value + "\" is not in my database.")
             return
         
         # block recursion
         old_val = None
-        if key in self.info_db:
+        if str(key) in self.info_db:
             old_val = self.info_db[key]
         self.info_db[key] = value # we will go ahead and set this so that
                                   # recursion can be fully tested, and then we
@@ -123,7 +123,7 @@ class UserDefinedCommand(command.BaseCommand):
     def db_del(self, key, event):
         self.modified = True
         key = key.lower()
-        if key not in self.info_db:
+        if str(key) not in self.info_db:
             self.parent_bot.send_message(event.target, event.source + ", \"!" +
                                          key + "\" is not in my database")
             return
@@ -131,7 +131,7 @@ class UserDefinedCommand(command.BaseCommand):
     
     
     def db_get(self, key, target, event):
-        if key not in self.info_db:
+        if str(key) not in self.info_db:
             self.parent_bot.send_message(event.target, event.source + ", \"!" +
                                          key +
                                          "\" is not in my database")

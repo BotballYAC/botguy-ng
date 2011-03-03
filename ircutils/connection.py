@@ -28,7 +28,7 @@ class Connection(asynchat.async_chat):
     def __init__(self, ipv6=False):
         asynchat.async_chat.__init__(self)
         self.ping_auto_respond = True
-        self.set_terminator("\r\n")
+        self.set_terminator(b"\r\n")
         self.collect_incoming_data = self._collect_incoming_data
         if ipv6:
             self.create_socket(socket.AF_INET6, socket.SOCK_STREAM)
@@ -60,7 +60,7 @@ class Connection(asynchat.async_chat):
     
     def found_terminator(self):
         """ Activated when ``\\r\\n`` is encountered. Do not call directly. """
-        data = "".join(self.incoming)
+        data = "".join([i.decode() for i in self.incoming])
         self.incoming = []
         prefix, command, params = protocol.parse_line(data)
         if command == "PING" and self.ping_auto_respond:
@@ -68,18 +68,6 @@ class Connection(asynchat.async_chat):
         if command.isdigit():
             command = responses.from_digit(command)
         self.handle_line(prefix, command, params)
-    
-    
-    def handle_error(self):
-        raise # Causes the error to propagate. I hate the compact traceback
-              # that asyncore uses.
-    
-    
-    def handle_connect(self):
-        """ Initializes SSL support after the connection has been made. """
-        if self.use_ssl:
-            self.ssl = ssl.wrap_socket(self.socket)
-            self.set_socket(self.ssl)
     
     
     def execute(self, command, *params, **kwargs):
@@ -92,8 +80,22 @@ class Connection(asynchat.async_chat):
         params = [x for x in params if x is not None]
         if "trailing" in kwargs:
             params = list(params)
-            params.append(":%s" % kwargs["trailing"])
-        self.push("%s %s\r\n" % (command.upper(), " ".join(params)))
+            if kwargs["trailing"] is not None:
+                params.append(":%s" % kwargs["trailing"])
+        self.push(("%s %s\r\n" % (command.upper(), " ".join(params))).encode())
+    
+    
+    def handle_error(self):
+        raise # Causes the error to propagate. I hate the compact traceback
+              # that asyncore uses.
+    
+    
+    def handle_connect(self):
+        """ Initializes SSL support after the connection has been made. This is used
+        internally. Do not call this yourself. """
+        if self.use_ssl:
+            self.ssl = ssl.wrap_socket(self.socket)
+            self.set_socket(self.ssl)
     
     
     def handle_line(self, prefix, command, params):

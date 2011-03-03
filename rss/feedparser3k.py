@@ -10,7 +10,7 @@ Required: Python 2.4 or later
 Recommended: CJKCodecs and iconv_codec <http://cjkpython.i18n.org/>
 """
 
-__version__ = "5.0"
+__version__ = "5.0.1"
 __license__ = """Copyright (c) 2002-2008, Mark Pilgrim, All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
@@ -135,7 +135,8 @@ ACCEPTABLE_URI_SCHEMES = (
 #ACCEPTABLE_URI_SCHEMES = ()
 
 # ---------- required modules (should come with any Python distribution) ----------
-import re, sys, copy, time, types, cgi, urllib, datetime
+from . import sgmllib3k as sgmllib
+import re, sys, copy, urllib.parse, time, types, cgi, urllib, urllib.request, urllib.error, urllib.parse, datetime
 try:
     from io import BytesIO as _StringIO
 except ImportError:
@@ -143,15 +144,6 @@ except ImportError:
         from io import StringIO as _StringIO
     except:
         from io import StringIO as _StringIO
-
-try:
-    import sgmllib
-    import urlparse
-    import urllib2
-except ImportError:
-    import sgmllib3k as sgmllib
-    import urllib.parse as urlparse
-    import urllib.request, urllib.error
 
 # ---------- optional modules (feedparser will work without these, but with reduced functionality) ----------
 
@@ -207,19 +199,15 @@ except:
 
 # reversable htmlentitydefs mappings for Python 2.2
 try:
-    from html.entities import name2codepoint, codepoint2name
+  from html.entities import name2codepoint, codepoint2name
 except:
-    try:
-        from htmlentitydefs import name2codepoint, codepoint2name
-    except:
-        import htmlentitydefs
-        name2codepoint={}
-        codepoint2name={}
-        for (name,codepoint) in htmlentitydefs.entitydefs.iteritems():
-            if codepoint.startswith('&#'):
-                codepoint=unichr(int(codepoint[2:-1]))
-            name2codepoint[name]=ord(codepoint)
-            codepoint2name[ord(codepoint)]=name
+  import html.entities
+  name2codepoint={}
+  codepoint2name={}
+  for (name,codepoint) in html.entities.entitydefs.items():
+    if codepoint.startswith('&#'): codepoint=chr(int(codepoint[2:-1]))
+    name2codepoint[name]=ord(codepoint)
+    codepoint2name[ord(codepoint)]=name
 
 # BeautifulSoup parser used for parsing microformats from embedded HTML content
 # http://www.crummy.com/software/BeautifulSoup/
@@ -411,40 +399,35 @@ def _ebcdic_to_ascii(s):
         _ebcdic_to_ascii_map = _maketrans( \
             _l2bytes(list(range(256))), _l2bytes(emap))
     return s.translate(_ebcdic_to_ascii_map)
-
-try:
-    unichr
-except NameError:
-    unichr = chr
  
 _cp1252 = {
-  unichr(128): unichr(8364), # euro sign
-  unichr(130): unichr(8218), # single low-9 quotation mark
-  unichr(131): unichr( 402), # latin small letter f with hook
-  unichr(132): unichr(8222), # double low-9 quotation mark
-  unichr(133): unichr(8230), # horizontal ellipsis
-  unichr(134): unichr(8224), # dagger
-  unichr(135): unichr(8225), # double dagger
-  unichr(136): unichr( 710), # modifier letter circumflex accent
-  unichr(137): unichr(8240), # per mille sign
-  unichr(138): unichr( 352), # latin capital letter s with caron
-  unichr(139): unichr(8249), # single left-pointing angle quotation mark
-  unichr(140): unichr( 338), # latin capital ligature oe
-  unichr(142): unichr( 381), # latin capital letter z with caron
-  unichr(145): unichr(8216), # left single quotation mark
-  unichr(146): unichr(8217), # right single quotation mark
-  unichr(147): unichr(8220), # left double quotation mark
-  unichr(148): unichr(8221), # right double quotation mark
-  unichr(149): unichr(8226), # bullet
-  unichr(150): unichr(8211), # en dash
-  unichr(151): unichr(8212), # em dash
-  unichr(152): unichr( 732), # small tilde
-  unichr(153): unichr(8482), # trade mark sign
-  unichr(154): unichr( 353), # latin small letter s with caron
-  unichr(155): unichr(8250), # single right-pointing angle quotation mark
-  unichr(156): unichr( 339), # latin small ligature oe
-  unichr(158): unichr( 382), # latin small letter z with caron
-  unichr(159): unichr( 376)} # latin capital letter y with diaeresis
+  chr(128): chr(8364), # euro sign
+  chr(130): chr(8218), # single low-9 quotation mark
+  chr(131): chr( 402), # latin small letter f with hook
+  chr(132): chr(8222), # double low-9 quotation mark
+  chr(133): chr(8230), # horizontal ellipsis
+  chr(134): chr(8224), # dagger
+  chr(135): chr(8225), # double dagger
+  chr(136): chr( 710), # modifier letter circumflex accent
+  chr(137): chr(8240), # per mille sign
+  chr(138): chr( 352), # latin capital letter s with caron
+  chr(139): chr(8249), # single left-pointing angle quotation mark
+  chr(140): chr( 338), # latin capital ligature oe
+  chr(142): chr( 381), # latin capital letter z with caron
+  chr(145): chr(8216), # left single quotation mark
+  chr(146): chr(8217), # right single quotation mark
+  chr(147): chr(8220), # left double quotation mark
+  chr(148): chr(8221), # right double quotation mark
+  chr(149): chr(8226), # bullet
+  chr(150): chr(8211), # en dash
+  chr(151): chr(8212), # em dash
+  chr(152): chr( 732), # small tilde
+  chr(153): chr(8482), # trade mark sign
+  chr(154): chr( 353), # latin small letter s with caron
+  chr(155): chr(8250), # single right-pointing angle quotation mark
+  chr(156): chr( 339), # latin small ligature oe
+  chr(158): chr( 382), # latin small letter z with caron
+  chr(159): chr( 376)} # latin capital letter y with diaeresis
 
 _urifixer = re.compile('^([A-Za-z][A-Za-z0-9+-.]*://)(/*)(.*?)')
 def _urljoin(base, uri):
@@ -765,7 +748,7 @@ class _FeedParserMixin:
 
     def mapContentType(self, contentType):
         contentType = contentType.lower()
-        if contentType == 'text':
+        if contentType == 'text' or contentType == 'plain':
             contentType = 'text/plain'
         elif contentType == 'html':
             contentType = 'text/html'
@@ -1987,6 +1970,14 @@ class _BaseHTMLProcessor(sgmllib.SGMLParser):
         '''Return processed HTML as a single string'''
         return ''.join([str(p) for p in self.pieces])
 
+    def parse_declaration(self, i):
+        try:
+            return sgmllib.SGMLParser.parse_declaration(self, i)
+        except sgmllib.SGMLParseError:
+            # escape the doctype declaration and continue parsing
+            self.handle_data('&lt;')
+            return i+1
+
 class _LooseFeedParser(_FeedParserMixin, _BaseHTMLProcessor):
     def __init__(self, baseuri, baselang, encoding, entities):
         sgmllib.SGMLParser.__init__(self)
@@ -2492,9 +2483,10 @@ def _makeSafeAbsoluteURI(base, rel=None):
     if not base:
         return rel or ''
     if not rel:
-        if base.strip().split(':', 1)[0] not in ACCEPTABLE_URI_SCHEMES:
-            return ''
-        return base
+        scheme = urllib.parse.urlparse(base)[0]
+        if not scheme or scheme in ACCEPTABLE_URI_SCHEMES:
+            return base
+        return ''
     uri = _urljoin(base, rel)
     if uri.strip().split(':', 1)[0] not in ACCEPTABLE_URI_SCHEMES:
         return ''
@@ -2682,6 +2674,9 @@ class _HTMLSanitizer(_BaseHTMLProcessor):
         for key, value in self.normalize_attrs(attrs):
             if key in acceptable_attributes:
                 key=keymap.get(key,key)
+                # make sure the uri uses an acceptable uri scheme
+                if key == 'href':
+                    value = _makeSafeAbsoluteURI(value)
                 clean_attrs.append((key,value))
             elif key=='style':
                 clean_value = self.sanitize_style(value)
@@ -2736,6 +2731,18 @@ class _HTMLSanitizer(_BaseHTMLProcessor):
               clean.append(prop + ': ' + value + ';')
 
         return ' '.join(clean)
+
+    def parse_comment(self, i, report=1):
+        ret = _BaseHTMLProcessor.parse_comment(self, i, report)
+        if ret >= 0:
+            return ret
+        # if ret == -1, this may be a malicious attempt to circumvent
+        # sanitization, or a page-destroying unclosed comment
+        match = re.compile(r'--[^>]*>').search(self.rawdata, i+4)
+        if match:
+            return match.end()
+        # unclosed comment; deliberately fail to handle_data()
+        return len(self.rawdata)
 
 
 def _sanitizeHTML(htmlSource, encoding, _type):
