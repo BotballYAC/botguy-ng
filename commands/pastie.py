@@ -5,9 +5,12 @@
 # Released under the terms of the GNU General Public License, version 2 or 3
 
 try:
-    import urllib.request as urllib
+    import urllib.request as urllib_req
+    import urllib.parse as urllib_par
 except:
     import urllib
+    urllib_req = urllib
+    urllib_par = urllib
 
 DEFAULT_NAME=None
 
@@ -26,7 +29,8 @@ class Pastie(object):
         }
         if self.name is not None:
             form['paste[display_name]'] = self.name
-        f = urllib.urlopen("http://pastie.org/pastes", urllib.parse.urlencode(form))
+        f = urllib_req.urlopen("http://pastie.org/pastes",
+                               urllib_par.urlencode(form))
         f.close()
         return f.geturl()
 
