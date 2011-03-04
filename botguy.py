@@ -60,14 +60,16 @@ class Botguy(bot.SimpleBot):
             m = event.message
             has_curse = False
             # Cursing
-            for c in curses.regex_curses:
-                if c.search(m):
-                    self.send_message(event.target,
-                                      event.source + ", please refrain from " +
-                                      "using cuss words in the " + event.target
-                                      + " chat.")
-                    has_curse = True
-                    break
+            if botguy_config.block_cursing:
+                for c in curses.regex_curses:
+                    if c.search(m):
+                        self.send_message(event.target,
+                                          event.source +
+                                          ", please refrain from " +
+                                          "using cuss words in the " +
+                                          event.target + " chat.")
+                        has_curse = True
+                        break
             if not has_curse:
                 base_command_re = re.compile(r"!(\w+)(\s+(.+))?")
                 base_command_match = base_command_re.match(m)
