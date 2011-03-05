@@ -1,13 +1,14 @@
-from ircutils import bot
+from bot.ircutils import bot
 import re
-import curses
-from rss import rss
-from rss import rss_feeds
-import shove, dbm
+from bot import curses
+from bot.rss import rss
+from bot.rss import rss_feeds
+from bot import shove
+import dbm
 import atexit
 import threading
 import traceback
-from commands import userdef
+from bot.commands import userdef
 
 class Botguy(bot.SimpleBot):
     
@@ -18,8 +19,8 @@ class Botguy(bot.SimpleBot):
             del kwargs["command_file"]
         super(Botguy, self).__init__(*args, **kwargs)
         self.channel_set = set()
-        self.info_db = shove.Shove("file://" + command_file, protocol=2)
-        atexit.register(self.info_db.close)
+        self.command_db = shove.Shove("file://" + command_file, protocol=2)
+        atexit.register(self.command_db.close)
         self.commands_list = [userdef.UserDefinedCommand(self)]
         self.commands_list.sort()
         #for f in rss_feeds.feed_list:
@@ -106,7 +107,7 @@ class Botguy(bot.SimpleBot):
                 self.send_message(c, entry.link + ": " + entry.title)
 
 if __name__ == "__main__":
-    import botguy_config
+    from bot import botguy_config
     bot = Botguy(botguy_config.nick, command_file=botguy_config.info_file)
     bot.connect(botguy_config.server, channel=botguy_config.channels)
     bot.start()
