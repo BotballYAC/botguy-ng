@@ -3,7 +3,7 @@ import re
 import curses
 from rss import rss
 from rss import rss_feeds
-import shelve, dbm
+import shove, dbm
 import atexit
 import threading
 import traceback
@@ -13,15 +13,12 @@ class Botguy(bot.SimpleBot):
     
     def __init__(self, *args, **kwargs):
         info_file = "botguy_info.db"
-        if "info_file" in kwargs:
-            info_file = kwargs["info_file"]
-            del kwargs["info_file"]
+        if "command_file" in kwargs:
+            command_file = kwargs["command_file"]
+            del kwargs["command_file"]
         super(Botguy, self).__init__(*args, **kwargs)
         self.channel_set = set()
-        try:
-            self.info_db = shelve.open(info_file, protocol=2)
-        except dbm.error:
-            self.info_db = shelve.open(info_file[:-3], protocol=2)
+        self.info_db = shove.Shove("file://" + command_file, protocol=2)
         atexit.register(self.info_db.close)
         self.commands_list = [userdef.UserDefinedCommand(self)]
         self.commands_list.sort()
@@ -110,6 +107,6 @@ class Botguy(bot.SimpleBot):
 
 if __name__ == "__main__":
     import botguy_config
-    bot = Botguy(botguy_config.nick, info_file=botguy_config.info_file)
+    bot = Botguy(botguy_config.nick, command_file=botguy_config.info_file)
     bot.connect(botguy_config.server, channel=botguy_config.channels)
     bot.start()
