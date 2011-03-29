@@ -8,11 +8,10 @@ class UserDefinedCommand(BaseCommand):
         regex = re.compile("(set|del|get|get_raw|list|.*)")
         super(UserDefinedCommand, self).__init__(parent_bot, regex, "userdef",
                                                  priority)
-        if self.database is None:
-            self.database = {}
         self.modified = True
         self.last_list_url = None
         self.command_ref_re = re.compile(r"!(\w+)")
+        self._register_db("shelf", writeback=False)
     
     def parse_command(self, command, args, event):
         if command == "set":
@@ -38,15 +37,16 @@ class UserDefinedCommand(BaseCommand):
             else:
                 listing = ""
                 ref_dict = {}
-                keys = list(self.database.keys())
+                keys = list(self._database.keys())
                 while keys:
                     i = keys[0]; del keys[0]
                     ref_set = set()
-                    while self.command_ref_re.match(self.database[i]):
+                    while self.command_ref_re.match(self._database[i]):
                         ref_set.add(i)
-                        i = self.command_ref_re.match(self.database[i]).group(1)
+                        i = self.command_ref_re.match(self._database[i]) \
+                            .group(1)
                     ref_set.add(i)
-                    i = self.database[i]
+                    i = self._database[i]
                     if i in ref_dict:
                         ref_dict[i] |= ref_set
                     else:
@@ -89,16 +89,16 @@ class UserDefinedCommand(BaseCommand):
         key = key.lower()
         # block undefined references
         match = self.command_ref_re.match(value)
-        if match and (str(match.group(1)) not in self.database):
+        if match and (str(match.group(1)) not in self._database):
             self.parent_bot.send_message(event.target, event.source + ", \"" +
                                          value + "\" is not in my database.")
             return
         
         # block recursion
         old_val = None
-        if str(key) in self.database:
-            old_val = self.database[key]
-        self.database[key] = value # we will go ahead and set this so that
+        if str(key) in self._database:
+            old_val = self._database[key]
+        self._database[key] = value # we will go ahead and set this so that
                                   # recursion can be fully tested, and then we
                                   # will remove it later if something goes wrong
         cur_ref = value # current ref, this will change each iteration
@@ -113,42 +113,42 @@ class UserDefinedCommand(BaseCommand):
                                              "reference")
                 # remove from db:
                 if old_val:
-                    self.database[key] = old_val
+                    self._database[key] = old_val
                 else:
-                    del self.database[key]
+                    del self._database[key]
                 return # something went wrong, exit early
             ref_set.add(g)
-            cur_ref = self.database[g]
+            cur_ref = self._database[g]
             cur_ref_match = self.command_ref_re.match(cur_ref)
     
     
     def db_del(self, key, event):
         self.modified = True
         key = key.lower()
-        if str(key) not in self.database:
+        if str(key) not in self._database:
             self.parent_bot.send_message(event.target, event.source + ", \"!" +
                                          key + "\" is not in my database")
             return
-        del self.database[key]
+        del self._database[key]
     
     
     def db_get(self, key, target, event):
-        if str(key) not in self.database:
+        if str(key) not in self._database:
             self.parent_bot.send_message(event.target, event.source + ", \"!" +
                                          key +
                                          "\" is not in my database")
             return
         # process references
         while True:
-            m = self.command_ref_re.match(self.database[key])
+            m = self.command_ref_re.match(self._database[key])
             if not m: break
             key = m.group(1)
         if target: # if we need to address this to someone
             self.parent_bot.send_message(event.target, target + ", " +
-                                         self.database[key])
+                                         self._database[key])
         else:
-            self.parent_bot.send_message(event.target, self.database[key])
+            self.parent_bot.send_message(event.target, self._database[key])
     
     
     def db_get_raw(self, key, event):
-        self.parent_bot.send_message(event.target, self.database[key])
+        self.parent_bot.send_message(event.target, self._database[key])

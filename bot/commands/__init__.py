@@ -6,10 +6,13 @@ class BaseCommand(object):
     __metaclass__ = abc.ABCMeta
     
     @abc.abstractmethod
-    def __init__(self, parent_bot, command_re, command_name, priority=50):
+    def __init__(self, parent_bot, command_re, command_name,
+                 priority=50):
+        super(BaseCommand, self).__init__()
         self.__parent_bot = parent_bot
         self.__command_re = command_re
         self.__command_name = command_name
+        self.__db_handler = None
         self.priority = priority
     
     @abc.abstractmethod
@@ -34,12 +37,20 @@ class BaseCommand(object):
     def __cmp__(self, other):
         return self.priority - other.priority
     
-    def get_database(self):
-        if self.name in self.parent_bot.command_db:
-            return self.parent_bot.command_db[self.name]
-        return None
+    def _register_database(self, *args, **kwargs):
+        self.__db_handler = self.parent_bot.command_db.register_plugin(
+            self.__command_name, *args, **kwargs
+        )
     
-    def set_database(self, db):
-        self.parent_bot.command_db[self.name] = db
+    _register_db = _register_database
     
-    database = property(get_database, set_database)
+    def _get_database_handler(self):
+        return self.__db_handler
+    
+    _get_db_handler = _get_database_handler
+    
+    _get_database = _get_database_handler
+    
+    _database_handler = property(_get_database_handler)
+    _db_handler = property(_get_db_handler)
+    _database = property(_get_database)

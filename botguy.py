@@ -3,9 +3,8 @@ import re
 from bot import curses
 from bot.rss import rss
 from bot.rss import rss_feeds
-from bot import shove
+from bot import database
 import dbm
-import atexit
 import threading
 import traceback
 from bot.commands import userdef
@@ -19,8 +18,7 @@ class Botguy(bot.SimpleBot):
             del kwargs["command_file"]
         super(Botguy, self).__init__(*args, **kwargs)
         self.channel_set = set()
-        self.command_db = shove.Shove("file://" + command_file, protocol=2)
-        atexit.register(self.command_db.close)
+        self.command_db = database.Database(command_file, True)
         self.commands_list = [userdef.UserDefinedCommand(self)]
         self.commands_list.sort()
         #for f in rss_feeds.feed_list:
