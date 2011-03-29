@@ -37,11 +37,15 @@ class Database(object):
     
     def sync(self):
         assert not self.__closed
+        for i in self._db_handlers.values():
+            i.sync()
         self.connection.commit()
     
     def close(self):
         if not self.__closed:
             self.sync()
+            for i in self._db_handlers.values():
+                i.close(sync=False)
             self.connection.close()
             del self.connection
     
@@ -110,8 +114,9 @@ class DatabaseCodec(object):
     def sync(self):
         self._base_set_data(self.__value)
     
-    def close(self):
-        self.sync()
+    def close(self, sync=True):
+        if sync:
+            self.sync()
         self._cursor.close()
         self.__closed = True
     
@@ -173,7 +178,7 @@ class SqlTableCodec(DatabaseCodec):
         pass
 
 class DatabaseDict(DatabaseCodec):
-    def __init__(self, name, cursor, writeback=False):
+    def __init__(self, name, cursor, writeback=False, pickled=True):
         super(DatabaseDict, self).__init__(name, cursor, writeback=False)
         self._table = "plugin_db_%s" % name
         self._cursor.execute(
@@ -182,6 +187,16 @@ class DatabaseDict(DatabaseCodec):
         )
         self.__cached_values = {}
         self._writeback = writeback
+        if pickled:
+            self._encode = blob
+            self._decode = unblob
+        else:
+            try:
+                unicode
+                self._encode = lambda x: unicode(x)
+            except:
+                self._encode = lambda x: x
+            self._decode = lambda x: x
     
     def _base_get_data(self):
         raise AttributeError("Not yet implemented")
@@ -206,7 +221,7 @@ class DatabaseDict(DatabaseCodec):
         try:
             return self.__cached_values[key]
         except:
-            return unblob(
+            return self._decode(
                 self._cursor.execute(
                     "SELECT value FROM %s WHERE key=?" % self._table, (key, )
                 ).fetchone()[0]
@@ -217,7 +232,7 @@ class DatabaseDict(DatabaseCodec):
             self.__cached_values[key] = value
         self._cursor.execute(
             "INSERT OR REPLACE INTO %s VALUES(?, ?)" % self._table,
-            (key, blob(value))
+            (key, self._encode(value))
         )
     
     def __delitem__(self, key):
@@ -229,7 +244,7 @@ class DatabaseDict(DatabaseCodec):
         for i in self.__cached_values:
             self._cursor.execute(
                 "INSERT OR REPLACE INTO %s VALUES(?, ?)" % self._table,
-                (key, blob(i))
+                (key, self._encode(i))
             )
         self.__cached_values = {}
 

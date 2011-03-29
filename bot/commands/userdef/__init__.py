@@ -11,7 +11,7 @@ class UserDefinedCommand(BaseCommand):
         self.modified = True
         self.last_list_url = None
         self.command_ref_re = re.compile(r"!(\w+)")
-        self._register_db("shelf", writeback=False)
+        self._register_db("shelf", writeback=False, pickled=False)
     
     def parse_command(self, command, args, event):
         if command == "set":
