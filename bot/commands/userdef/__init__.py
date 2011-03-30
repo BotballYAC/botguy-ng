@@ -1,6 +1,7 @@
 from .. import BaseCommand
 import re
 from .. import pastie
+import textwrap
 
 class UserDefinedCommand(BaseCommand):
     
@@ -55,7 +56,8 @@ class UserDefinedCommand(BaseCommand):
                 for k in list(ref_dict.keys()):
                     for i in ref_dict[k]:
                         listing += i + ":\n"
-                    listing += "\t" + k + "\n"
+                    listing += textwrap.fill(k, 80, initial_indent=" " * 4,
+                                             subsequent_indent=" " * 4) + "\n\n"
                 url = pastie.Pastie(body=listing, parser=None, private=False,
                                     name=self.parent_bot.nickname).submit()
                 self.parent_bot.send_message(event.target, event.source + ", " +
