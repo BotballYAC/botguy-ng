@@ -207,6 +207,18 @@ class DatabaseDict(DatabaseCodec):
     def _base_del_data(self):
         raise AttributeError("Not yet implemented")
     
+    def keys(self):
+        return [
+            i[0] for i in
+            self._cursor.execute("SELECT key FROM %s" % self._table)
+        ]
+    
+    def values(self):
+        return [
+            self._decode(i[0]) for i in
+            self._cursor.execute("SELECT value FROM %s" % self._table)
+        ]
+    
     def __iter__(self):
         for i in self._cursor.execute("SELECT key FROM %s" % self._table):
             yield i[0];
