@@ -16,11 +16,18 @@ class Botguy(bot.SimpleBot):
         if "command_file" in kwargs:
             command_file = kwargs["command_file"]
             del kwargs["command_file"]
+        plugins = []
+        if "plugins" in kwargs:
+            plugins = kwargs["plugins"]
+            del kwargs["plugins"]
         super(Botguy, self).__init__(*args, **kwargs)
         self.channel_set = set()
         self.command_db = database.Database(command_file, True)
-        self.commands_list = [userdef.UserDefinedCommand(self)]
-        self.commands_list.sort()
+        self.commands_list = [i(self) for i in plugins]
+        try:
+            self.commands_list.sort()
+        except:
+            self.commands_list.sort(key=lambda x:x.priority)
         #for f in rss_feeds.feed_list:
         #    rss.RssPoller(f[0], self.on_feed_update, f[1])
     
@@ -106,6 +113,7 @@ class Botguy(bot.SimpleBot):
 
 if __name__ == "__main__":
     from bot import botguy_config
-    bot = Botguy(botguy_config.nick, command_file=botguy_config.info_file)
+    bot = Botguy(botguy_config.nick, command_file=botguy_config.info_file,
+                 plugins=botguy_config.command_plugins)
     bot.connect(botguy_config.server, channel=botguy_config.channels)
     bot.start()
