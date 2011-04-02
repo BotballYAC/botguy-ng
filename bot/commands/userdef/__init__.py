@@ -14,27 +14,24 @@ class UserDefinedCommand(BaseCommand):
         self.command_ref_re = re.compile(r"!(\w+)")
         self._register_db("shelf", writeback=False, pickled=False)
     
-    def parse_command(self, command, args, event):
+    def parse_command(self, command, args, event, public):
         if command == "set":
             set_command = None
             if args:
                 set_command = re.match(r"(\w+)\s+(.+)", args)
             if not set_command:
-                self.parent_bot.send_message(event.target, event.source +
-                                             ", !set command_name something " +
-                                             "to say")
+                self.send_message(event, "!set command_name something to say",
+                                  True)
             else:
                 self.db_set(set_command.group(1), set_command.group(2), event)
         elif command == "del":
             if not args:
-                self.parent_bot.send_message(event.target, event.source +
-                                             ", !del command_name")
+                self.parent_bot.send_message(event, "!del command_name", True)
             else:
                 self.db_del(args, event)
         elif command == "list":
             if not self.modified:
-                self.parent_bot.send_message(event.target, event.source + ", " +
-                                                           self.last_list_url)
+                self.send_message(event, self.last_list_url, True)
             else:
                 listing = ""
                 ref_dict = {}
@@ -60,14 +57,12 @@ class UserDefinedCommand(BaseCommand):
                                              subsequent_indent=" " * 4) + "\n\n"
                 url = pastie.Pastie(body=listing, parser=None, private=False,
                                     name=self.parent_bot.nickname).submit()
-                self.parent_bot.send_message(event.target, event.source + ", " +
-                                                           url)
+                self.send_message(event, url, True)
                 self.modified = False
                 self.last_list_url = url
         elif command == "get":
             if not args:
-                self.parent_bot.send_message(event.target, event.source +
-                                             ", !get command_name [prefix]")
+                self.send_message(event, "!get command_name [prefix]", True)
             else:
                 get_command = re.match(r"(\w+)(\s+(.+))?", args)
                 target = None
@@ -78,8 +73,7 @@ class UserDefinedCommand(BaseCommand):
                 self.db_get(get_command.group(1), target, event)
         elif command == "get_raw":
             if not args:
-                self.parent_bot.send_message(event.target, event.source +
-                                             ", !get_raw command_name")
+                self.send_message(event, "!get_raw command_name", True)
             else:
                 self.db_get_raw(args, event)
         else:
@@ -92,8 +86,8 @@ class UserDefinedCommand(BaseCommand):
         # block undefined references
         match = self.command_ref_re.match(value)
         if match and (str(match.group(1)) not in self._database):
-            self.parent_bot.send_message(event.target, event.source + ", \"" +
-                                         value + "\" is not in my database.")
+            self.send_message(event, "\"%s\" is not in my database." % value,
+                              True)
             return
         
         # block recursion
@@ -110,9 +104,8 @@ class UserDefinedCommand(BaseCommand):
         while cur_ref_match: # while we are still dealing with refs
             g = cur_ref_match.group(1) # g = grouping
             if g in ref_set: # we have a duplicate, recursion!
-                self.parent_bot.send_message(event.target, event.source +
-                                             ", that would make a recursive " +
-                                             "reference")
+                self.send_message(event,
+                                  "That would make a recursive reference", True)
                 # remove from db:
                 if old_val:
                     self._database[key] = old_val
@@ -128,29 +121,26 @@ class UserDefinedCommand(BaseCommand):
         self.modified = True
         key = key.lower()
         if str(key) not in self._database:
-            self.parent_bot.send_message(event.target, event.source + ", \"!" +
-                                         key + "\" is not in my database")
+            self.send_message(event, "\"!%s\" is not in my database" % key,
+                              True)
             return
         del self._database[key]
     
     
     def db_get(self, key, target, event):
         if str(key) not in self._database:
-            self.parent_bot.send_message(event.target, event.source + ", \"!" +
-                                         key +
-                                         "\" is not in my database")
+            self.send_message(event, "\"!%s\" is not in my database" % key,
+                              True)
             return
         # process references
         while True:
             m = self.command_ref_re.match(self._database[key])
             if not m: break
             key = m.group(1)
-        if target: # if we need to address this to someone
-            self.parent_bot.send_message(event.target, target + ", " +
-                                         self._database[key])
-        else:
-            self.parent_bot.send_message(event.target, self._database[key])
+        if not target:
+            target = False
+        self.send_message(event, self._database[key], target)
     
     
     def db_get_raw(self, key, event):
-        self.parent_bot.send_message(event.target, self._database[key])
+        self.send_message(event, self._database[key])

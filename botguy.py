@@ -57,52 +57,84 @@ class Botguy(bot.SimpleBot):
             with threading.Lock():
                 self.channel_set.remove(event.target)
     
+    def has_curse(self, message):
+        if botguy_config.block_cursing:
+                for c in curses.regex_curses:
+                    if c.search(message):
+                        return True
+        return False
+    
     def on_channel_message(self, event):
         with threading.Lock():
             if event.source == self.nickname: return
             m = event.message
-            has_curse = False
             # Cursing
-            if botguy_config.block_cursing:
-                for c in curses.regex_curses:
-                    if c.search(m):
-                        self.send_message(event.target,
-                                          event.source +
-                                          ", please refrain from " +
-                                          "using cuss words in the " +
-                                          event.target + " chat.")
-                        has_curse = True
-                        break
-            if not has_curse:
-                base_command_re = re.compile(r"!(\w+)(\s+(.+))?")
-                base_command_match = base_command_re.match(m)
-                if base_command_match:
-                    command_name = base_command_match.group(1)
-                    command_args = None
-                    try:
-                        command_args = base_command_match.group(3)
-                    except IndexError:
-                        pass
-                    had_command = False
-                    for c in self.commands_list:
-                        if c.command_re.match(command_name):
-                            try: # sandboxing!
-                                c.parse_command(command_name, command_args,
-                                                event)
-                            except Exception as ex:
-                                self.send_message(event.target, event.source +
-                                                  ", something has caused me " +
-                                                  "to run into an error. " +
-                                                  "Please bother the " +
-                                                  "operator of this bot to " +
-                                                  "fix me.")
-                                print((traceback.print_exc()))
-                            had_command = True
-                            break;
-                    if not had_command:
-                        self.send_message(event.target, event.source +
-                                      ", sorry, \"!" + command_name + "\" is " +
-                                      "not a defined command.")
+            if self.has_curse(m):
+                self.send_message(event.target, event.source +
+                    ", please refrain from using cuss words in the " +
+                    event.target + " chat.")
+            else:
+                self.parse_command(event, True)
+    
+    def on_private_message(self, event):
+        with threading.Lock():
+            if event.source == self.nickname: return
+            m = event.message
+            # Cursing
+            if self.has_curse(m):
+                self.send_message(event.source,
+                                  "Please refrain from using cuss words")
+            else:
+                self.parse_command(event, False)
+    
+    def parse_command(self, event, public_message):
+        # pre-process event
+        m = event.message
+        channel = None
+        user = event.source
+        if public_message:
+            channel = event.target
+        
+        def send_message(msg):
+            print(msg)
+            if public_message:
+                self.send_message(channel, "%s, %s" % (user, msg))
+            else:
+                self.send_message(user, msg)
+        
+        base_command_re = r"(\w+)(\s+(.+))?"
+        if public_message:
+            base_command_re = "!%s" % base_command_re
+        else:
+            base_command_re = "!?%s" % base_command_re
+        base_command_re = re.compile(base_command_re)
+        base_command_match = base_command_re.match(m)
+        
+        if base_command_match:
+            command_name = base_command_match.group(1)
+            command_args = None
+            try:
+                command_args = base_command_match.group(3)
+            except IndexError:
+                pass
+            had_command = False
+            for c in self.commands_list:
+                if (c.public and public_message or
+                    c.private and not public_message) \
+                   and c.command_re.match(command_name):
+                    try: # sandboxing!
+                        c.parse_command(command_name, command_args,
+                                        event, public_message)
+                    except Exception as ex:
+                        send_message("Something has caused me to run into an " +
+                                     "error. Please bother the operator of " +
+                                     "this bot to fix me.")
+                        print((traceback.print_exc()))
+                    had_command = True
+                    break;
+            if not had_command:
+                send_message("Sorry, \"!%s\" is not a defined commmand" %
+                             command_name)
     
     def on_feed_update(self, entry):
         for c in self.channel_set:
