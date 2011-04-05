@@ -20,14 +20,16 @@ class Botguy(bot.SimpleBot):
         if "plugins" in kwargs:
             plugins = kwargs["plugins"]
             del kwargs["plugins"]
+        if "superusers" in kwargs:
+            self.superusers = kwargs["superusers"]
+            del kwargs["superusers"]
+        else:
+            self.superusers = []
         super(Botguy, self).__init__(*args, **kwargs)
         self.channel_set = set()
         self.command_db = database.Database(command_file, True)
-        self.commands_list = [i(self) for i in plugins]
-        try:
-            self.commands_list.sort()
-        except:
-            self.commands_list.sort(key=lambda x:x.priority)
+        self.commands_list = sorted([i(self) for i in plugins],
+                                    key=lambda x: x.priority)
         #for f in rss_feeds.feed_list:
         #    rss.RssPoller(f[0], self.on_feed_update, f[1])
     
@@ -102,7 +104,7 @@ class Botguy(bot.SimpleBot):
             else:
                 self.send_message(user, msg)
         
-        base_command_re = r"(\w+)(\s+(.+))?"
+        base_command_re = r"(\w+)(\s+(.+))?\s*"
         if public_message:
             base_command_re = "!%s" % base_command_re
         else:
@@ -146,6 +148,7 @@ class Botguy(bot.SimpleBot):
 if __name__ == "__main__":
     from bot import botguy_config
     bot = Botguy(botguy_config.nick, command_file=botguy_config.info_file,
-                 plugins=botguy_config.command_plugins)
+                 plugins=botguy_config.command_plugins,
+                 superusers=botguy_config.superusers)
     bot.connect(botguy_config.server, channel=botguy_config.channels)
     bot.start()

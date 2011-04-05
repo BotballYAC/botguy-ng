@@ -8,7 +8,7 @@ class UserDefinedCommand(BaseCommand):
     def __init__(self, parent_bot, priority=95):
         regex = re.compile("(set|del|get|get_raw|list|.*)")
         super(UserDefinedCommand, self).__init__(parent_bot, regex, "userdef",
-                                                 priority)
+                                                 priority=priority)
         self.modified = True
         self.last_list_url = None
         self.command_ref_re = re.compile(r"!(\w+)")
