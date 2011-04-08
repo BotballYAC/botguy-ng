@@ -11,9 +11,9 @@ pickle_protocol = botguy_config.pickle_protocol
 
 try: # python 2
     buffer
-    blob = lambda x: buffer(pickle.dumps(x, pickle_protocol))
+    blob = lambda x: None if not x else buffer(pickle.dumps(x, pickle_protocol))
 except: # python 3
-    blob = lambda x: bytes(pickle.dumps(x, pickle_protocol))
+    blob = lambda x: None if not x else bytes(pickle.dumps(x, pickle_protocol))
 
 try: # python 3
     bytes
@@ -220,8 +220,11 @@ class DatabaseDict(DatabaseCodec):
         ]
     
     def __iter__(self):
-        for i in self._cursor.execute("SELECT key FROM %s" % self._table):
-            yield i[0];
+        i = self._cursor.execute("SELECT key FROM %s" % self._table)
+        result = i.fetchone()
+        while result:
+            yield result;
+            result.fetchone()
     
     def __contains__(self, key):
         return (self._writeback and key in self.__cached_values) or \

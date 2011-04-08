@@ -124,10 +124,18 @@ class UserDefinedCommand(BaseCommand):
             self.send_message(event, "\"!%s\" is not in my database" % key,
                               True)
             return
+        for i in self._database:
+            ref_match = self.command_ref_re.match(self._database[i])
+            if ref_match and ref_match.group(1) == key:
+                self.send_message(event, ("\"!%s\" is a referenced by " +
+                                  "\"!%s\". You should delete \"!%s\" first.") %
+                                  (key, i, i), True)
+                return
         del self._database[key]
     
     
     def db_get(self, key, target, event):
+        key = key.lower()
         if str(key) not in self._database:
             self.send_message(event, "\"!%s\" is not in my database" % key,
                               True)
