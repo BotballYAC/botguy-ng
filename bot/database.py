@@ -223,8 +223,8 @@ class DatabaseDict(DatabaseCodec):
         i = self._cursor.execute("SELECT key FROM %s" % self._table)
         result = i.fetchone()
         while result:
-            yield result;
-            result.fetchone()
+            yield result[0];
+            result = i.fetchone()
     
     def __contains__(self, key):
         return (self._writeback and key in self.__cached_values) or \
@@ -236,11 +236,12 @@ class DatabaseDict(DatabaseCodec):
         try:
             return self.__cached_values[key]
         except:
-            return self._decode(
+            r = self._decode(
                 self._cursor.execute(
                     "SELECT value FROM %s WHERE key=?" % self._table, (key, )
-                ).fetchone()[0]
+                ).fetchone()
             )
+            return None if not r else r[0]
     
     def __setitem__(self, key, value):
         if self._writeback:

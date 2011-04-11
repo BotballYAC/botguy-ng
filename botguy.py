@@ -7,7 +7,6 @@ from bot import database
 import dbm
 import threading
 import traceback
-from bot.commands import userdef
 
 class Botguy(bot.SimpleBot):
     
@@ -27,8 +26,8 @@ class Botguy(bot.SimpleBot):
             self.superusers = []
         super(Botguy, self).__init__(*args, **kwargs)
         self.channel_set = set()
-        self.command_db = database.Database(command_file, True)
-        self.commands_list = sorted([i(self) for i in plugins],
+        self.plugin_db = database.Database(command_file, True)
+        self.plugins_list = sorted([i(self) for i in plugins],
                                     key=lambda x: x.priority)
         #for f in rss_feeds.feed_list:
         #    rss.RssPoller(f[0], self.on_feed_update, f[1])
@@ -98,7 +97,6 @@ class Botguy(bot.SimpleBot):
             channel = event.target
         
         def send_message(msg):
-            print(msg)
             if public_message:
                 self.send_message(channel, "%s, %s" % (user, msg))
             else:
@@ -120,13 +118,10 @@ class Botguy(bot.SimpleBot):
             except IndexError:
                 pass
             had_command = False
-            for c in self.commands_list:
-                if (c.public and public_message or
-                    c.private and not public_message) \
-                   and c.command_re.match(command_name):
+            for p in self.plugins_list:
+                if p.supports_command(event, command_name, command_args):
                     try: # sandboxing!
-                        c.parse_command(command_name, command_args,
-                                        event, public_message)
+                        p.parse_command(event, command_name, command_args)
                     except Exception as ex:
                         send_message("Something has caused me to run into an " +
                                      "error. Please bother the operator of " +

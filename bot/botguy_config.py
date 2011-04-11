@@ -1,5 +1,4 @@
-from .commands import userdef
-from .commands import vote
+from .plugins import userdef
 
 # Basic Configuration:
 nick = "botguy-ng"
@@ -7,7 +6,7 @@ info_file = "botguy_info_converted.db"
 server = "irc.freenode.net"
 channels = ["#botball"]
 block_cursing = True
-command_plugins = [userdef.UserDefinedCommand, vote.VoteCommand]
+command_plugins = [userdef.UserDefinedCommand]
 superusers = ["pipeep"]
 
 # Advanced Options
