@@ -8,7 +8,6 @@ import textwrap
 class UserDefinedCommand(BasePlugin):
     
     def __init__(self, parent_bot, priority=95):
-        regex = re.compile("(set|del|get|get_raw|list|.*)")
         super(UserDefinedCommand, self).__init__(parent_bot, "userdef",
                                                  priority=priority)
         self.modified = True
@@ -21,17 +20,17 @@ class UserDefinedCommand(BasePlugin):
     def set_command(self, opts):
         args = opts.args
         if not args:
-            return CommandReply(self.set_command.command_simple_help)
+            return ErrorCommandReply()
         arg_match = re.match(r"(\w+)\s+(.+)", args)
         if not arg_match or opts.args != arg_match.group(0):
-            return CommandReply(self.set_command.command_simple_help)
+            return ErrorCommandReply()
         key, value = arg_match.group(1), arg_match.group(2)
         self.modified = True
         key = key.lower()
         # block undefined references
         match = self.command_ref_re.match(value)
         if match and (str(match.group(1)) not in self._database):
-            return CommandReply("\"%s\" is not in my database." % value)
+            return ErrorCommandReply("\"%s\" is not in my database." % value)
         
         # block recursion
         old_val = None
@@ -52,7 +51,9 @@ class UserDefinedCommand(BasePlugin):
                     self._database[key] = old_val
                 else:
                     del self._database[key]
-                return CommandReply("That would make a recursive reference")
+                return ErrorCommandReply(
+                    "That would make a recursive reference"
+                )
             ref_set.add(g)
             cur_ref = self._database[g]
             cur_ref_match = self.command_ref_re.match(cur_ref)
@@ -64,11 +65,11 @@ class UserDefinedCommand(BasePlugin):
     def del_command(self, opts):
         key = opts.args
         if not key:
-            return CommandReply(self.del_command.command_simple_help)
+            return ErrorCommandReply()
         
         key = key.lower()
         if key not in self._database:
-            return CommandReply("\"!%s\" is not in my database" % key)
+            return ErrorCommandReply("\"!%s\" is not in my database" % key)
         for i in self._database:
             ref_match = self.command_ref_re.match(self._database[i])
             if ref_match and ref_match.group("name") == key:

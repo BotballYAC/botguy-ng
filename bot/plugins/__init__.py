@@ -47,7 +47,10 @@ class BasePlugin(object):
             if m and m.group(0) == command.command:
                 result = i(command)
                 if isinstance(result, CommandReply):
-                    result.send_reply(command)
+                    if isinstance(result, ErrorCommandReply):
+                        result.send_reply(command, i.command_simple_help)
+                    else:
+                        result.send_reply(command)
                 return True
         return False
     
@@ -146,7 +149,7 @@ class CommandReply(CommandReplyBase):
         another user, you could change the reply ``target``."""
         return CommandReplyBase.__new__(cls, message, addressed, target)
     
-    def send_reply(self, command_call):
+    def send_reply(self, command_call, message=None):
         parent_bot = command_call.parent_bot
         
         # solve for target
@@ -167,14 +170,25 @@ class CommandReply(CommandReplyBase):
             addressed = False
         
         # solve for message
-        message = self.message
+        if not message:
+            message = self.message
         if addressed:
             message = "%s, %s" % (addressed, message)
         
         # send it off
         parent_bot.send_message(target, message)
 
-
+class ErrorCommandReply(CommandReply):
+    def __new__(cls, message=None):
+        return CommandReply.__new__(cls, message, addressed=True)
+    
+    def send_message(self, command_call, default_message="Something has " +
+                     "caused me to run into an error. Please bother the " +
+                     "operator of this bot to fix me."):
+        if not self.message:
+            CommandReply.send_reply(self, command_call, default_message)
+        else:
+            CommandReply.send_reply(self, command_call)
 
 try:
     basestring
