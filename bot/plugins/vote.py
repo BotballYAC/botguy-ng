@@ -1,38 +1,43 @@
 import re
 import collections
-from . import BaseCommand
+from . import BasePlugin
+from . import command
+from . import CommandReply
 
 class VoteCommand(BaseCommand):
     
     def __init__(self, parent_bot, priority=50):
-        regex = re.compile("(make_poll|del_poll|vote|poll_results|list_polls)")
-        super(VoteCommand, self).__init__(parent_bot, regex, "votepoll",
+        super(VoteCommand, self).__init__(parent_bot, "votepoll",
                                           priority=priority)
         self._register_db("shelf", writeback=False, pickled=True)
         self.modified = True
         self.last_list_url = None
     
-    def parse_command(self, command, args, event, public):
-        if command == "make_poll":
-            match = re.match(r"(?P<poll_name>\w+)\s+(?P<question>.*?)\s*" +
-                             r"\(\s*(?P<options>\w+(,\s?\w+)+)\s*\)", args)
-            if not match or match.group(0) != args:
-                self.send_message(event, "!make_poll poll_name What is your " +
-                                  "favorite color? (red, green, blue, purple)",
-                                  True)
-                return
-            groups = match.groupdict()
-            if groups["poll_name"] in self._database:
-                self.send_message(event, ("The poll name \"%s\" has already " +
-                                  "been taken") % groups["poll_name"], True)
-                return
-            options = dict.fromkeys(re.split(r"\s*,\s*", groups["options"]))
-            for i in options: options[i] = set()
-            poll = Poll(groups["poll_name"], event.source, groups["question"],
-                        options)
-            self._database[poll.name] = poll
-            self.modified = True
-        elif command == "del_poll":
+    @command("make_poll",
+             "!make_poll poll_name Some question? (red, green, blue, purple)")
+    def make_poll_command(self, opts):
+        # Parse command
+        match = re.match(r"(?P<poll_name>\w+)\s+(?P<question>.*?)\s*" +
+                         r"\(\s*(?P<options>\w+(,\s?\w+)+)\s*\)", opts.args)
+        if not match or match.group(0) != opts.args:
+            return CommandReply(self.make_poll_command.command_simple_help)
+        
+        groups = match.groupdict()
+        if groups["poll_name"] in self._database:
+            return CommandReply("The poll name \"%s\" has already been taken" %
+                                groups["poll_name"])
+        
+        choices = dict.fromkeys(re.split(r"\s*,\s*", groups["options"]))
+        for i in choices: choices[i] = set()
+        
+        # generate and store poll object
+        poll = Poll(groups["poll_name"], opts.caller, groups["question"],
+                    choices)
+        self._database[poll.name] = poll
+        self.modified = True
+    
+    @command("del_poll", "!del poll_name")
+    def del_poll_command(self, opts)
             match = re.match(r"\w+", args)
             if not match or match.group(0) != args:
                 self.send_message(event, "!del poll_name", True)
